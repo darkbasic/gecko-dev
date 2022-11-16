@@ -40,6 +40,37 @@ static_assert(JS_GENERATED_ATOMICS_WORDSIZE == WORDSIZE);
 static constexpr size_t WORDMASK = WORDSIZE - 1;
 static constexpr size_t BLOCKMASK = BLOCKSIZE - 1;
 
+#elif defined(JS_CODEGEN_PPC64)
+// XXX
+  // The return address is in LR (an SPR); it's not (probably) on the stack.
+  iter->argBase = masm.framePushed();
+#elif defined(JS_CODEGEN_PPC64)
+  masm.as_blr();
+#if defined(JS_CODEGEN_PPC64)
+      masm.compareExchange(size, sync, addr, AtomicValReg, AtomicVal2Reg,
+                           AtomicTemp, AtomicTemp2, AtomicTemp3, ReturnReg);
+      break;
+#endif
+#if defined(JS_CODEGEN_PPC64)
+      masm.compareExchange(size, sync, addr, AtomicValReg, AtomicVal2Reg,
+                           InvalidReg, InvalidReg, InvalidReg, ReturnReg);
+#else
+#endif
+#if defined(JS_CODEGEN_PPC64)
+      masm.atomicExchange(size, sync, addr, AtomicValReg,
+                          AtomicTemp, AtomicTemp2, AtomicTemp3, ReturnReg);
+      break;
+#endif
+#if defined(JS_CODEGEN_PPC64)
+      masm.atomicExchange(size, sync, addr, AtomicValReg,
+                          InvalidReg, InvalidReg, InvalidReg, ReturnReg);
+#else
+#endif
+#if defined(JS_CODEGEN_PPC64)
+      masm.atomicFetchOp(size, sync, op, AtomicValReg, addr, tmp, AtomicTemp2,
+                         AtomicTemp3, ReturnReg);
+#else
+#endif
 namespace js {
 namespace jit {
 
@@ -55,6 +86,9 @@ static bool UnalignedAccessesAreOK() {
 #  elif defined(__aarch64__)
   // This is not necessarily true but it's the best guess right now.
   return true;
+#elif defined(JS_CODEGEN_PPC64)
+  // We'd sure like to avoid it, even though it works.
+  return false;
 #  else
 #    error "Unsupported platform"
 #  endif

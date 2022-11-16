@@ -1677,6 +1677,13 @@ Value SnapshotIterator::allocationValue(const RValueAllocation& alloc,
 
     case RValueAllocation::ANY_FLOAT_REG:
       return Float32Value(fromRegister<float>(alloc.fpuReg()));
+#if defined(JS_CODEGEN_PPC64)
+      // PowerPC FPRs do not expose to the ISA if they were floats or
+      // doubles (the ISA treats them largely interchangeably), so
+      // they are always written as doubles on bailout.
+      return Float32Value((float)pun.d);
+#else
+#endif
 
     case RValueAllocation::ANY_FLOAT_STACK:
       return Float32Value(ReadFrameFloat32Slot(fp_, alloc.stackOffset()));
@@ -2274,6 +2281,17 @@ char* MachineState::SafepointState::addressOfRegister(FloatRegister reg) const {
     }
   }
   MOZ_CRASH("Invalid register");
+  }
+#elif defined(JS_CODEGEN_PPC64)
+  for (unsigned i = 0; i < FloatRegisters::TotalPhys; i++) {
+    machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Double),
+                                &fpregs[i]);
+    machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Single),
+                                &fpregs[i]);
+#  ifdef ENABLE_WASM_SIMD
+     // Needs additional handling if VMX or non-FPR VSX regs are in play.
+#    error "SIMD for PPC NYI"
+#  endif
 }
 
 uintptr_t MachineState::read(Register reg) const {

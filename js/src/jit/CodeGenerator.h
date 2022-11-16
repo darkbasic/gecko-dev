@@ -24,6 +24,8 @@
 #  include "jit/mips64/CodeGenerator-mips64.h"
 #elif defined(JS_CODEGEN_LOONG64)
 #  include "jit/loong64/CodeGenerator-loong64.h"
+#elif defined(JS_CODEGEN_PPC64)
+#  include "jit/ppc64/CodeGenerator-ppc64.h"
 #elif defined(JS_CODEGEN_WASM32)
 #  include "jit/wasm32/CodeGenerator-wasm32.h"
 #elif defined(JS_CODEGEN_NONE)

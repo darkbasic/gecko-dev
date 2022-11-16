@@ -40,6 +40,8 @@
 #  include "jit/mips64/MacroAssembler-mips64-inl.h"
 #elif defined(JS_CODEGEN_LOONG64)
 #  include "jit/loong64/MacroAssembler-loong64-inl.h"
+#elif defined(JS_CODEGEN_PPC64)
+#  include "jit/ppc64/MacroAssembler-ppc64-inl.h"
 #elif defined(JS_CODEGEN_WASM32)
 #  include "jit/wasm32/MacroAssembler-wasm32-inl.h"
 #elif !defined(JS_CODEGEN_NONE)

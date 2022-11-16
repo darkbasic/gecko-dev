@@ -115,6 +115,13 @@ static constexpr Register RabaldrScratchI32 = CallTempReg2;
 static constexpr Register RabaldrScratchI32 = CallTempReg2;
 #endif
 
+#ifdef JS_CODEGEN_PPC64
+#  define RABALDR_SCRATCH_I32
+// We can use all the argregs up, and we don't want the JIT using our own
+// private scratch registers, so this is the best option of what's left.
+static constexpr Register RabaldrScratchI32 = r19;
+#endif
+
 #ifdef RABALDR_SCRATCH_F32_ALIASES_F64
 #  if !defined(RABALDR_SCRATCH_F32) || !defined(RABALDR_SCRATCH_F64)
 #    error "Bad configuration"
@@ -387,6 +394,11 @@ struct SpecificRegs {
     defined(JS_CODEGEN_LOONG64)
 struct SpecificRegs {
   // Required by gcc.
+  SpecificRegs() {}
+};
+#elif defined(JS_CODEGEN_PPC64)
+struct SpecificRegs {
+  // Because gcc.
   SpecificRegs() {}
 };
 #else
