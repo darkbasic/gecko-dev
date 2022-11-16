@@ -729,7 +729,8 @@ static bool GenerateInterpEntry(MacroAssembler& masm, const FuncExport& fe,
 
   // Save the return address if it wasn't already saved by the call insn.
 #ifdef JS_USE_LINK_REGISTER
-#  if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS64)
+#  if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS64) || \
+      defined(JS_CODEGEN_PPC64)
   masm.pushReturnAddress();
 #  elif defined(JS_CODEGEN_ARM64)
   // WasmPush updates framePushed() unlike pushReturnAddress(), but that's
@@ -2123,7 +2124,16 @@ static bool GenerateImportInterpExit(MacroAssembler& masm, const FuncImport& fi,
 
   // Make the call, test whether it succeeded, and extract the return value.
   AssertStackAlignment(masm, ABIStackAlignment);
+#ifdef JS_CODEGEN_PPC64
+  // Because this is calling an ABI-compliant function, we have to pull down
+  // a dummy linkage area or the values on the stack will be stomped on. The
+  // minimum size is sufficient.
+  masm.as_addi(masm.getStackPointer(), masm.getStackPointer(), -32);
+#endif
   masm.call(SymbolicAddress::CallImport_General);
+#ifdef JS_CODEGEN_PPC64
+  masm.as_addi(masm.getStackPointer(), masm.getStackPointer(), 32);
+#endif
   masm.branchTest32(Assembler::Zero, ReturnReg, ReturnReg, throwLabel);
 
   ResultType resultType = ResultType::Vector(fi.funcType().results());
@@ -2576,6 +2586,11 @@ static void PushFrame(MacroAssembler& masm) {
   masm.subFromStackPtr(Imm32(sizeof(Frame)));
   masm.storePtr(ra, Address(StackPointer, Frame::returnAddressOffset()));
   masm.storePtr(FramePointer, Address(StackPointer, Frame::callerFPOffset()));
+#elif defined(JS_CODEGEN_PPC64)
+  masm.xs_mflr(ScratchRegister);
+  masm.as_addi(StackPointer, StackPointer, -sizeof(Frame));
+  masm.as_std(ScratchRegister, StackPointer, Frame::returnAddressOffset());
+  masm.as_std(FramePointer, StackPointer, Frame::callerFPOffset());
 #elif defined(JS_CODEGEN_ARM64)
   {
     AutoForbidPoolsAndNops afp(&masm,
@@ -2605,6 +2620,11 @@ static void PopFrame(MacroAssembler& masm) {
   masm.loadPtr(Address(StackPointer, Frame::callerFPOffset()), FramePointer);
   masm.loadPtr(Address(StackPointer, Frame::returnAddressOffset()), ra);
   masm.addToStackPtr(Imm32(sizeof(Frame)));
+#elif defined(JS_CODEGEN_PPC64)
+  masm.as_ld(ScratchRegister, StackPointer, Frame::returnAddressOffset());
+  masm.xs_mtlr(ScratchRegister);
+  masm.as_ld(FramePointer, StackPointer, Frame::callerFPOffset());
+  masm.as_addi(StackPointer, StackPointer, sizeof(Frame));
 #elif defined(JS_CODEGEN_ARM64)
   {
     AutoForbidPoolsAndNops afp(&masm,
@@ -2688,7 +2708,7 @@ bool wasm::GenerateIndirectStub(MacroAssembler& masm,
   // it during stack walking.
   PushFrame(masm);
   masm.moveStackPtrTo(FramePointer);
-  masm.addPtr(Imm32(wasm::TrampolineFpTag), Address(FramePointer, 0));
+  masm.addPtr(Imm32(wasm::TrampolineFpTag), Address(FramePointer, Frame::callerFPOffset()));
 
   Label prepareFrameOnCalleeBehalfAndJumpCallee;
 
@@ -2704,7 +2724,7 @@ bool wasm::GenerateIndirectStub(MacroAssembler& masm,
   masm.loadWasmPinnedRegsFromTls();
   masm.switchToWasmTlsRealm(WasmTableCallIndexReg, WasmTableCallScratchReg1);
 
-#if defined(JS_CODEGEN_MIPS64)
+#if defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_PPC64)
   masm.abiret();
 #elif defined(JS_CODEGEN_ARM64)
   // See comment in |GenerateCallablePrologue|.
@@ -2844,6 +2864,11 @@ static const LiveRegisterSet RegsToPreserve(
 static const LiveRegisterSet RegsToPreserve(
     GeneralRegisterSet(Registers::AllMask &
                        ~(Registers::SetType(1) << Registers::StackPointer)),
+    FloatRegisterSet(FloatRegisters::AllMask));
+#elif defined(JS_CODEGEN_PPC64)
+// Note that this includes no SPRs, since the JIT is unaware of them.
+static const LiveRegisterSet RegsToPreserve(
+    GeneralRegisterSet(Registers::AllMask),
     FloatRegisterSet(FloatRegisters::AllMask));
 #else
 static const LiveRegisterSet RegsToPreserve(

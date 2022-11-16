@@ -47,6 +47,9 @@
 #  include "jit/mips-shared/Assembler-mips-shared.h"
 #  include "jit/mips64/Assembler-mips64.h"
 #endif
+#if defined(JS_CODEGEN_PPC64)
+#  include "jit/ppc64/Assembler-ppc64.h"
+#endif
 #include "js/ScalarType.h"
 #include "util/Memory.h"
 #include "wasm/TypedObject.h"
@@ -165,6 +168,10 @@ enum class RhsDestOp { True = true };
 #  define RABALDR_INT_DIV_I64_CALLOUT
 #  define RABALDR_I64_TO_FLOAT_CALLOUT
 #  define RABALDR_FLOAT_TO_I64_CALLOUT
+#endif
+
+#ifdef JS_CODEGEN_PPC64
+#  define RABALDR_HAS_HEAPREG
 #endif
 
 #ifdef JS_CODEGEN_NONE

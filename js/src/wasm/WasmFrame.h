@@ -89,6 +89,15 @@ constexpr uint32_t IndirectStubAdditionalAlignment = 0u;
 // time is (sizeof(wasm::Frame) + masm.framePushed) % WasmStackAlignment.
 
 class Frame {
+#if defined(JS_CODEGEN_PPC64)
+  // Since Wasm can call directly to ABI-compliant routines, the Frame must
+  // have an ABI-compliant linkage area. We allocate four doublewords, the
+  // minimum size.
+  void *_ppc_sp_;
+  void *_ppc_cr_;
+  void *_ppc_lr_;
+  void *_ppc_toc_;
+#endif
   // See GenerateCallableEpilogue for why this must be
   // the first field of wasm::Frame (in a downward-growing stack).
   // It's either the caller's Frame*, for wasm callers, or the JIT caller frame
@@ -170,8 +179,11 @@ class Frame {
 };
 
 static_assert(!std::is_polymorphic_v<Frame>, "Frame doesn't need a vtable.");
+#if !defined(JS_CODEGEN_PPC64)
+// PowerPC requires a linkage area, so this assert doesn't hold on that arch.
 static_assert(sizeof(Frame) == 2 * sizeof(void*),
               "Frame is a two pointer structure");
+#endif
 
 class FrameWithTls : public Frame {
   // `ShadowStackSpace` bytes will be allocated here on Win64, at higher

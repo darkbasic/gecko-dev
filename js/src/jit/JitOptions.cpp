@@ -140,7 +140,12 @@ DefaultJitOptions::DefaultJitOptions() {
   SET_DEFAULT(jitForTrustedPrincipals, false);
 
   // Whether the RegExp JIT is enabled.
+#if defined(JS_CODEGEN_PPC64)
+  // This may generate ISA 3 instructions. The other JIT tiers gate on it too.
+  SET_DEFAULT(nativeRegExp, MacroAssembler::SupportsFloatingPoint());
+#else
   SET_DEFAULT(nativeRegExp, true);
+#endif
 
   // Whether Warp should use ICs instead of transpiling Baseline CacheIR.
   SET_DEFAULT(forceInlineCaches, false);

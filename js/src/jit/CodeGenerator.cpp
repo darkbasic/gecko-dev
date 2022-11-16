@@ -2194,6 +2194,13 @@ static bool PrepareAndExecuteRegExp(JSContext* cx, MacroAssembler& masm,
       Address(masm.getStackPointer(), inputOutputDataStartOffset), temp2);
   masm.PushRegsInMask(volatileRegs);
   masm.setupUnalignedABICall(temp3);
+#if defined(JS_CODEGEN_PPC64)
+  // temp1 aliases argregs on this platform, so we need to reuse temp3 again
+  // or we'll stomp on the code pointer when we pass the first ABI argument.
+  // Everything gets clobbered anyway!
+  masm.xs_mr(temp3, codePointer);
+  codePointer = temp3;
+#endif
   masm.passABIArg(temp2);
   masm.callWithABI(codePointer);
   masm.storeCallInt32Result(temp1);

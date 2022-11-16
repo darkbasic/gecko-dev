@@ -477,7 +477,8 @@ void BaseCompiler::executeLoad(MemoryAccessDesc* access, AccessCheck* check,
     // there's no constraint on what the output register may be.
     masm.wasmLoad(*access, srcAddr, dest.any());
   }
-#elif defined(JS_CODEGEN_MIPS64)
+#elif defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_PPC64)
+// XXX: we don't really need this anymore
   if (IsUnaligned(*access)) {
     switch (dest.tag) {
       case AnyReg::I64:
@@ -545,7 +546,7 @@ void BaseCompiler::load(MemoryAccessDesc* access, AccessCheck* check,
   // generated is the same for the 64-bit and the 32-bit case.
   return executeLoad(access, check, tls, RegI32(ptr.reg), dest,
                      maybeFromI64(temp));
-#  elif defined(JS_CODEGEN_MIPS64)
+#  elif defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_PPC64)
   // On mips64, the 'prepareMemoryAccess' function will make sure that ptr holds
   // a valid 64-bit index value. Thus the code generated in 'executeLoad' is the
   // same for the 64-bit and the 32-bit case.
@@ -601,7 +602,8 @@ void BaseCompiler::executeStore(MemoryAccessDesc* access, AccessCheck* check,
   } else {
     masm.wasmStore(*access, src.any(), HeapReg, ptr, ptr);
   }
-#elif defined(JS_CODEGEN_MIPS64)
+#elif defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_PPC64)
+// XXX: we don't really need this anymore
   if (IsUnaligned(*access)) {
     switch (src.tag) {
       case AnyReg::I64:
@@ -655,7 +657,7 @@ void BaseCompiler::store(MemoryAccessDesc* access, AccessCheck* check,
   return executeStore(access, check, tls, RegI32(ptr.low), src,
                       maybeFromI64(temp));
 #  elif defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_ARM64) || \
-      defined(JS_CODEGEN_MIPS64)
+      defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_PPC64)
   return executeStore(access, check, tls, RegI32(ptr.reg), src,
                       maybeFromI64(temp));
 #  else
@@ -1134,7 +1136,7 @@ static void Deallocate(BaseCompiler* bc, RegI32 rv, const Temps& temps) {
   bc->freeI32(temps.t0);
 }
 
-#elif defined(JS_CODEGEN_MIPS64)
+#elif defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_PPC64)
 
 struct Temps {
   RegI32 t0, t1, t2;
@@ -1304,7 +1306,8 @@ static void Deallocate(BaseCompiler* bc, AtomicOp op, RegI64 rv, RegI64 temp) {
   bc->freeI64(temp);
 }
 
-#elif defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS64)
+#elif defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS64) || \
+      defined(JS_CODEGEN_PPC64)
 
 static void PopAndAllocate(BaseCompiler* bc, AtomicOp op, RegI64* rd,
                            RegI64* rv, RegI64* temp) {
@@ -1464,7 +1467,7 @@ static void Deallocate(BaseCompiler* bc, RegI32 rv, const Temps&) {
   bc->freeI32(rv);
 }
 
-#elif defined(JS_CODEGEN_MIPS64)
+#elif defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_PPC64)
 
 struct Temps {
   RegI32 t0, t1, t2;
@@ -1593,7 +1596,8 @@ static void Deallocate(BaseCompiler* bc, RegI64 rd, RegI64 rv) {
   bc->freeI32(bc->specific_.ecx);
 }
 
-#elif defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS64)
+#elif defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS64) || \
+      defined(JS_CODEGEN_PPC64)
 
 static void PopAndAllocate(BaseCompiler* bc, RegI64* rd, RegI64* rv) {
   *rv = bc->popI64();
@@ -1760,7 +1764,7 @@ static void Deallocate(BaseCompiler* bc, RegI32 rexpect, RegI32 rnew,
   bc->freeI32(rexpect);
 }
 
-#elif defined(JS_CODEGEN_MIPS64)
+#elif defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_PPC64)
 
 struct Temps {
   RegI32 t0, t1, t2;
@@ -1987,7 +1991,8 @@ static void Deallocate(BaseCompiler* bc, RegI64 rexpect, RegI64 rnew) {
   bc->freeI64(rnew);
 }
 
-#elif defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS64)
+#elif defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS64) || \
+      defined(JS_CODEGEN_PPC64)
 
 template <typename RegIndexType>
 static void PopAndAllocate(BaseCompiler* bc, RegI64* rexpect, RegI64* rnew,

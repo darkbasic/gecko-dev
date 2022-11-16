@@ -37,6 +37,8 @@
 #  include "jit/mips32/MacroAssembler-mips32-inl.h"
 #elif defined(JS_CODEGEN_MIPS64)
 #  include "jit/mips64/MacroAssembler-mips64-inl.h"
+#elif defined(JS_CODEGEN_PPC64)
+#  include "jit/ppc64/MacroAssembler-ppc64-inl.h"
 #elif !defined(JS_CODEGEN_NONE)
 #  error "Unknown architecture!"
 #endif

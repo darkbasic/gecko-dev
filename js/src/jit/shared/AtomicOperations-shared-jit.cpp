@@ -138,6 +138,28 @@ static constexpr Register64 AtomicVal2Reg64(ecx, ebx);
 
 // AtomicReturnReg64 is unused on x86.
 
+#elif defined(JS_CODEGEN_PPC64)
+
+// Selected registers match the argument registers, except that the Ptr is not
+// in IntArgReg0 so as not to conflict with the result register.
+
+static const LiveRegisterSet AtomicNonVolatileRegs;
+
+static constexpr Register AtomicPtrReg = IntArgReg4;
+static constexpr Register AtomicPtr2Reg = IntArgReg1;
+static constexpr Register AtomicValReg = IntArgReg1;
+static constexpr Register64 AtomicValReg64(IntArgReg1);
+static constexpr Register AtomicVal2Reg = IntArgReg2;
+static constexpr Register64 AtomicVal2Reg64(IntArgReg2);
+static constexpr Register AtomicTemp = IntArgReg3;
+static constexpr Register AtomicTemp2 = IntArgReg5;
+static constexpr Register AtomicTemp3 = IntArgReg6;
+static constexpr Register64 AtomicTemp64(IntArgReg3);
+static constexpr Register64 AtomicTemp64_2(IntArgReg5);
+static constexpr Register64 AtomicTemp64_3(IntArgReg6);
+
+static constexpr Register64 AtomicReturnReg64 = ReturnReg64;
+
 #else
 #  error "Unsupported platform"
 #endif
@@ -253,6 +275,10 @@ static uint32_t GenPrologue(MacroAssembler& masm, ArgIterator* iter) {
 #elif defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
   // The return address is pushed separately.
   iter->argBase = sizeof(void*) + masm.framePushed();
+#elif defined(JS_CODEGEN_PPC64)
+// XXX
+  // The return address is in LR (an SPR); it's not (probably) on the stack.
+  iter->argBase = masm.framePushed();
 #else
 #  error "Unsupported platform"
 #endif
@@ -268,6 +294,8 @@ static void GenEpilogue(MacroAssembler& masm) {
   masm.mov(lr, pc);
 #elif defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
   masm.ret();
+#elif defined(JS_CODEGEN_PPC64)
+  masm.as_blr();
 #endif
 }
 
@@ -419,11 +447,21 @@ static uint32_t GenCmpxchg(MacroAssembler& masm, Scalar::Type size,
   switch (size) {
     case SIZE8:
     case SIZE16:
+#if defined(JS_CODEGEN_PPC64)
+      masm.compareExchange(size, sync, addr, AtomicValReg, AtomicVal2Reg,
+                           AtomicTemp, AtomicTemp2, AtomicTemp3, ReturnReg);
+      break;
+#endif
     case SIZE32:
       GenGprArg(masm, MIRType::Int32, &iter, AtomicValReg);
       GenGprArg(masm, MIRType::Int32, &iter, AtomicVal2Reg);
+#if defined(JS_CODEGEN_PPC64)
+      masm.compareExchange(size, sync, addr, AtomicValReg, AtomicVal2Reg,
+                           InvalidReg, InvalidReg, InvalidReg, ReturnReg);
+#else
       masm.compareExchange(size, sync, addr, AtomicValReg, AtomicVal2Reg,
                            ReturnReg);
+#endif
       break;
     case SIZE64:
       GenGpr64Arg(masm, &iter, AtomicValReg64);
@@ -459,9 +497,19 @@ static uint32_t GenExchange(MacroAssembler& masm, Scalar::Type size,
   switch (size) {
     case SIZE8:
     case SIZE16:
+#if defined(JS_CODEGEN_PPC64)
+      masm.atomicExchange(size, sync, addr, AtomicValReg,
+                          AtomicTemp, AtomicTemp2, AtomicTemp3, ReturnReg);
+      break;
+#endif
     case SIZE32:
       GenGprArg(masm, MIRType::Int32, &iter, AtomicValReg);
+#if defined(JS_CODEGEN_PPC64)
+      masm.atomicExchange(size, sync, addr, AtomicValReg,
+                          InvalidReg, InvalidReg, InvalidReg, ReturnReg);
+#else
       masm.atomicExchange(size, sync, addr, AtomicValReg, ReturnReg);
+#endif
       break;
     case SIZE64:
 #if defined(JS_64BIT)
@@ -498,7 +546,12 @@ static uint32_t GenFetchOp(MacroAssembler& masm, Scalar::Type size, AtomicOp op,
       Register tmp = AtomicTemp;
 #endif
       GenGprArg(masm, MIRType::Int32, &iter, AtomicValReg);
+#if defined(JS_CODEGEN_PPC64)
+      masm.atomicFetchOp(size, sync, op, AtomicValReg, addr, tmp, AtomicTemp2,
+                         AtomicTemp3, ReturnReg);
+#else
       masm.atomicFetchOp(size, sync, op, AtomicValReg, addr, tmp, ReturnReg);
+#endif
       break;
     }
     case SIZE64: {
@@ -642,6 +695,9 @@ static bool UnalignedAccessesAreOK() {
 #elif defined(JS_CODEGEN_ARM64)
   // This is not necessarily true but it's the best guess right now.
   return true;
+#elif defined(JS_CODEGEN_PPC64)
+  // We'd sure like to avoid it, even though it works.
+  return false;
 #else
 #  error "Unsupported platform"
 #endif

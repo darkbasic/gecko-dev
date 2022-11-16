@@ -1597,9 +1597,16 @@ Value SnapshotIterator::allocationValue(const RValueAllocation& alloc,
       } pun;
       MOZ_ASSERT(alloc.fpuReg().isSingle());
       pun.d = fromRegister(alloc.fpuReg());
+#if defined(JS_CODEGEN_PPC64)
+      // PowerPC FPRs do not expose to the ISA if they were floats or
+      // doubles (the ISA treats them largely interchangeably), so
+      // they are always written as doubles on bailout.
+      return Float32Value((float)pun.d);
+#else
       // The register contains the encoding of a float32. We just read
       // the bits without making any conversion.
       return Float32Value(pun.f);
+#endif
     }
 
     case RValueAllocation::ANY_FLOAT_STACK:
@@ -2216,6 +2223,17 @@ MachineState MachineState::FromBailout(RegisterDump::GPRArray& regs,
         FloatRegister(FloatRegisters::Encoding(i), FloatRegisters::Double),
         &fpregs[i]);
     // No SIMD support in bailouts, SIMD is internal to wasm
+  }
+#elif defined(JS_CODEGEN_PPC64)
+  for (unsigned i = 0; i < FloatRegisters::TotalPhys; i++) {
+    machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Double),
+                                &fpregs[i]);
+    machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Single),
+                                &fpregs[i]);
+#  ifdef ENABLE_WASM_SIMD
+     // Needs additional handling if VMX or non-FPR VSX regs are in play.
+#    error "SIMD for PPC NYI"
+#  endif
   }
 
 #elif defined(JS_CODEGEN_NONE)

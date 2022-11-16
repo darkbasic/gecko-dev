@@ -381,6 +381,11 @@ static const unsigned PushedRetAddr = 8;
 static const unsigned PushedFP = 12;
 static const unsigned SetFP = 16;
 static const unsigned PoppedFP = 4;
+#elif defined(JS_CODEGEN_PPC64)
+static const unsigned PushedRetAddr = 12;
+static const unsigned PushedFP = 16;
+static const unsigned SetFP = 20;
+static const unsigned PoppedFP = 8;
 #elif defined(JS_CODEGEN_NONE)
 // Synthetic values to satisfy asserts and avoid compiler warnings.
 static const unsigned PushedRetAddr = 0;
@@ -478,6 +483,28 @@ static void GenerateCallablePrologue(MacroAssembler& masm, uint32_t* entry) {
     // And restore the SP-reg setting, per comment above.
     masm.SetStackPointer64(stashedSPreg);
   }
+#elif defined(JS_CODEGEN_PPC64)
+  {
+    *entry = masm.currentOffset();
+
+    // These must be in this precise order. Fortunately we can subsume the
+    // SPR load into the initial "verse" since it is treated atomically.
+    // The linkage area required for ABI compliance is baked into the Frame.
+    masm.xs_mflr(ScratchRegister);
+    masm.as_addi(StackPointer, StackPointer, -(sizeof(Frame)));
+    masm.as_std(ScratchRegister, StackPointer, Frame::returnAddressOffset());
+    MOZ_ASSERT_IF(!masm.oom(), PushedRetAddr == masm.currentOffset() - *entry);
+    masm.as_std(FramePointer, StackPointer, Frame::callerFPOffset());
+    MOZ_ASSERT_IF(!masm.oom(), PushedFP == masm.currentOffset() - *entry);
+    masm.xs_mr(FramePointer, StackPointer);
+    MOZ_ASSERT_IF(!masm.oom(), SetFP == masm.currentOffset() - *entry);
+
+    // Burn nops because we have to make this a multiple of 16 and the mfspr
+    // just screwed us.
+    masm.as_nop(); // 24
+    masm.as_nop(); // 28
+    masm.as_nop(); // 32 // trap point
+  }
 #else
   {
 #  if defined(JS_CODEGEN_ARM)
@@ -553,6 +580,18 @@ static void GenerateCallableEpilogue(MacroAssembler& masm, unsigned framePushed,
 
   // See comment at equivalent place in |GenerateCallablePrologue| above.
   masm.SetStackPointer64(stashedSPreg);
+
+#elif defined(JS_CODEGEN_PPC64)
+
+  masm.as_ld(FramePointer, StackPointer, Frame::callerFPOffset());
+  poppedFP = masm.currentOffset();
+  // This is suboptimal since we get serialized, but has to be in this order.
+  masm.as_ld(ScratchRegister, StackPointer, Frame::returnAddressOffset());
+  masm.xs_mtlr(ScratchRegister);
+  *ret = masm.currentOffset();
+
+  masm.as_addi(StackPointer, StackPointer, sizeof(Frame));
+  masm.as_blr();
 
 #else
   // Forbid pools for the same reason as described in GenerateCallablePrologue.
@@ -802,6 +841,13 @@ void wasm::GenerateJitEntryPrologue(MacroAssembler& masm, Offsets* offsets) {
     masm.Sub(sp, sp, 8);
     masm.storePtr(lr, Address(masm.getStackPointer(), 0));
     masm.adjustFrame(8);
+#elif defined(JS_CODEGEN_PPC64)
+    offsets->begin = masm.currentOffset();
+
+    // We have to burn a nop here to match the other prologue length.
+    masm.xs_mflr(ScratchRegister);
+    masm.as_nop(); // might as well explicitly wait for the mfspr to complete
+    masm.as_stdu(ScratchRegister, StackPointer, -8);
 #else
     // The x86/x64 call instruction pushes the return address.
     offsets->begin = masm.currentOffset();

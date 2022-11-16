@@ -818,7 +818,22 @@ void SMRegExpMacroAssembler::CheckBacktrackStackLimit() {
       AbsoluteAddress(isolate()->regexp_stack()->limit_address_address()),
       backtrack_stack_pointer_, &no_stack_overflow);
 
+#ifdef JS_CODEGEN_PPC64
+  // LR on PowerPC isn't a GPR, so we have to explicitly save it here before
+  // we call or we will end up erroneously returning after the call to the
+  // stack overflow handler when we |blr| out and inevitably underflow the
+  // irregexp stack on the next backtrack.
+  masm_.xs_mflr(temp1_);
+  masm_.as_stdu(temp1_, masm_.getStackPointer(), -8);
+#endif
+
   masm_.call(&stack_overflow_label_);
+
+#ifdef JS_CODEGEN_PPC64
+  masm_.as_ld(temp1_, masm_.getStackPointer(), 0);
+  masm_.xs_mtlr(temp1_);
+  masm_.as_addi(masm_.getStackPointer(), masm_.getStackPointer(), 8);
+#endif
 
   // Exit with an exception if the call failed
   masm_.branchTest32(Assembler::Zero, temp0_, temp0_,
@@ -1135,6 +1150,10 @@ void SMRegExpMacroAssembler::stackOverflowHandler() {
 
   // Adjust for the return address on the stack.
   size_t frameOffset = sizeof(void*);
+#ifdef JS_CODEGEN_PPC64
+  // We have a double return address.
+  frameOffset += sizeof(void*);
+#endif
 
   volatileRegs.takeUnchecked(temp0_);
   volatileRegs.takeUnchecked(temp1_);

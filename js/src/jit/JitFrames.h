@@ -158,6 +158,16 @@ struct ResumeFromException {
   static const uint32_t RESUME_WASM = 5;
   static const uint32_t RESUME_WASM_CATCH = 6;
 
+#if defined(JS_CODEGEN_PPC64)
+  // This gets built on the stack as part of exception returns. Because
+  // it goes right on top of the stack, an ABI-compliant routine can wreck
+  // it, so we implement a minimum Power ISA linkage area (four doublewords).
+  void *_ppc_sp_;
+  void *_ppc_cr_;
+  void *_ppc_lr_;
+  void *_ppc_toc_;
+#endif
+
   uint8_t* framePointer;
   uint8_t* stackPointer;
   uint8_t* target;

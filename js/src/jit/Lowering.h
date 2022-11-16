@@ -23,6 +23,8 @@
 #  include "jit/mips32/Lowering-mips32.h"
 #elif defined(JS_CODEGEN_MIPS64)
 #  include "jit/mips64/Lowering-mips64.h"
+#elif defined(JS_CODEGEN_PPC64)
+#  include "jit/ppc64/Lowering-ppc64.h"
 #elif defined(JS_CODEGEN_NONE)
 #  include "jit/none/Lowering-none.h"
 #else

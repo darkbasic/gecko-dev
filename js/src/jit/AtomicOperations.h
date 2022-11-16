@@ -378,9 +378,16 @@ constexpr inline bool AtomicOperations::isLockfreeJS(int32_t size) {
 #  else
 #    error "AtomicOperations on MIPS for an unknown compiler"
 #  endif
+#elif defined(__ppc64__) || defined(__PPC64__) || defined(__ppc64le__) || \
+      defined(__PPC64LE__)
+#  if defined(JS_CODEGEN_PPC64)
+/* XXX: should be #    include "jit/shared/AtomicOperations-shared-jit.h" */
+#    include "jit/shared/AtomicOperations-feeling-lucky.h"
+#  else
+#    include "jit/shared/AtomicOperations-feeling-lucky.h"
+#  endif
 #elif defined(__ppc__) || defined(__PPC__) || defined(__sparc__) ||     \
-    defined(__ppc64__) || defined(__PPC64__) || defined(__ppc64le__) || \
-    defined(__PPC64LE__) || defined(__alpha__) || defined(__hppa__) ||  \
+    defined(__alpha__) || defined(__hppa__) ||  \
     defined(__sh__) || defined(__s390__) || defined(__s390x__) ||       \
     defined(__m68k__) || defined(__riscv) || defined(__wasi__)
 #  include "jit/shared/AtomicOperations-feeling-lucky.h"

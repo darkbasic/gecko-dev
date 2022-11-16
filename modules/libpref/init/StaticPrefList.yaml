@@ -6202,7 +6202,7 @@
 
 - name: javascript.options.ion
   type: bool
-  value: true
+  value: false
   mirror: always  # LoadStartupJSPrefs
   do_not_use_directly: true
 
@@ -6468,7 +6468,7 @@
 
 - name: javascript.options.wasm_optimizingjit
   type: bool
-  value: true
+  value: false
   mirror: always
 
 #if defined(ENABLE_WASM_SIMD)

@@ -264,7 +264,7 @@ void BaseCompiler::tableSwitch(Label* theTable, RegI32 switchValue,
   // Jump indirect via table element.
   masm.ma_ldr(DTRAddr(scratch, DtrRegImmShift(switchValue, LSL, 2)), pc, Offset,
               Assembler::Always);
-#elif defined(JS_CODEGEN_MIPS64)
+#elif defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_PPC64)
   ScratchI32 scratch(*this);
   CodeLabel tableCl;
 
@@ -1199,6 +1199,15 @@ void BaseCompiler::passArg(ValType type, const Stk& arg, FunctionCall* call) {
                                       argLoc.offsetFromArgBase()));
       } else {
         loadI32(arg, RegI32(argLoc.gpr()));
+#if JS_CODEGEN_PPC64
+          // If this is a call to compiled C++, we must ensure that the
+          // upper 32 bits are clear: addi can sign-extend, which yields
+          // difficult-to-diagnose bugs when the function expects a uint32_t
+          // but the register it gets has a residual 64-bit value.
+          if (call->usesSystemAbi) {
+            masm.as_rldicl(argLoc.gpr(), argLoc.gpr(), 0, 32);
+          }
+#endif
       }
       break;
     }
@@ -1434,7 +1443,8 @@ RegI32 BaseCompiler::needRotate64Temp() {
 #if defined(JS_CODEGEN_X86)
   return needI32();
 #elif defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_ARM) || \
-    defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS64)
+    defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS64) || \
+    defined(JS_CODEGEN_PPC64)
   return RegI32::Invalid();
 #else
   MOZ_CRASH("BaseCompiler platform hook: needRotate64Temp");
@@ -1489,6 +1499,8 @@ void BaseCompiler::popAndAllocateForMulI64(RegI64* r0, RegI64* r1,
   *temp = needI32();
 #elif defined(JS_CODEGEN_ARM64)
   pop2xI64(r0, r1);
+#elif defined(JS_CODEGEN_PPC64)
+  pop2xI64(r0, r1);
 #else
   MOZ_CRASH("BaseCompiler porting interface: popAndAllocateForMulI64");
 #endif
@@ -1508,6 +1520,12 @@ void BaseCompiler::popAndAllocateForDivAndRemI64(RegI64* r0, RegI64* r1,
 #  elif defined(JS_CODEGEN_ARM64)
   pop2xI64(r0, r1);
   if (isRemainder) {
+    *reserved = needI64();
+  }
+#  elif defined(JS_CODEGEN_PPC64)
+  pop2xI64(r0, r1);
+  if (isRemainder && !js::jit::HasPPCISA3()) { 
+    // Need temp register for CPUs that don't have mod* instructions.
     *reserved = needI64();
   }
 #  else
@@ -1544,6 +1562,13 @@ static void QuotientI64(MacroAssembler& masm, RegI64 rhs, RegI64 srcDest,
     masm.Udiv(sd, sd, r);
   } else {
     masm.Sdiv(sd, sd, r);
+  }
+#  elif defined(JS_CODEGEN_PPC64)
+  MOZ_ASSERT(reserved.isInvalid());
+  if (isUnsigned) {
+    masm.as_divdu(srcDest.reg, srcDest.reg, rhs.reg);
+  } else {
+    masm.as_divd(srcDest.reg, srcDest.reg, rhs.reg);
   }
 #  else
   MOZ_CRASH("BaseCompiler platform hook: quotientI64");
@@ -1584,6 +1609,24 @@ static void RemainderI64(MacroAssembler& masm, RegI64 rhs, RegI64 srcDest,
   }
   masm.Mul(t, t, r);
   masm.Sub(sd, sd, t);
+#  elif defined(JS_CODEGEN_PPC64)
+  if (js::jit::HasPPCISA3()) {
+    MOZ_ASSERT(reserved.isInvalid());
+    if (isUnsigned) {
+      masm.as_modud(srcDest.reg, srcDest.reg, rhs.reg);
+    } else {
+      masm.as_modsd(srcDest.reg, srcDest.reg, rhs.reg);
+    }
+  } else {
+    MOZ_ASSERT(!reserved.isInvalid());
+    if (isUnsigned) {
+      masm.as_divdu(reserved.reg, srcDest.reg, rhs.reg);
+    } else {
+      masm.as_divd(reserved.reg, srcDest.reg, rhs.reg);
+    }
+    masm.as_mulld(reserved.reg, reserved.reg, rhs.reg);
+    masm.as_subf(srcDest.reg, reserved.reg, srcDest.reg); // T = B - A
+  }
 #  else
   MOZ_CRASH("BaseCompiler platform hook: remainderI64");
 #  endif
@@ -1944,6 +1987,8 @@ static RegI32 PopcntTemp(BaseCompiler& bc) {
 #elif defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || \
     defined(JS_CODEGEN_MIPS64)
   return bc.needI32();
+#elif defined(JS_CODEGEN_PPC64)
+  return RegI32::Invalid();
 #else
   MOZ_CRASH("BaseCompiler platform hook: PopcntTemp");
 #endif
@@ -9951,7 +9996,8 @@ bool js::wasm::BaselinePlatformSupport() {
 #endif
 #if defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_X86) ||   \
     defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || \
-    defined(JS_CODEGEN_MIPS64)
+    defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_PPC64)
+  // PPC64 gates on other prerequisites internal to its code generator.
   return true;
 #else
   return false;

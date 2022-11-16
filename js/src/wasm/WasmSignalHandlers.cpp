@@ -108,7 +108,9 @@ using mozilla::DebugOnly;
 #    if defined(__ppc64__) || defined(__PPC64__) || defined(__ppc64le__) || \
         defined(__PPC64LE__)
 #      define R01_sig(p) ((p)->sc_frame.fixreg[1])
+#      define R31_sig(p) ((p)->sc_frame.fixreg[31])
 #      define R32_sig(p) ((p)->sc_frame.srr0)
+#      define R36_sig(p) ((p)->sc_frame.lr)
 #    endif
 #  elif defined(__linux__) || defined(__sun)
 #    if defined(__linux__)
@@ -154,7 +156,9 @@ using mozilla::DebugOnly;
 #    if defined(__linux__) && (defined(__ppc64__) || defined(__PPC64__) || \
                                defined(__ppc64le__) || defined(__PPC64LE__))
 #      define R01_sig(p) ((p)->uc_mcontext.gp_regs[1])
+#      define R31_sig(p) ((p)->uc_mcontext.gp_regs[31])
 #      define R32_sig(p) ((p)->uc_mcontext.gp_regs[32])
+#      define R36_sig(p) ((p)->uc_mcontext.gp_regs[36])
 #    endif
 #  elif defined(__NetBSD__)
 #    define EIP_sig(p) ((p)->uc_mcontext.__gregs[_REG_EIP])
@@ -180,7 +184,9 @@ using mozilla::DebugOnly;
 #    if defined(__ppc64__) || defined(__PPC64__) || defined(__ppc64le__) || \
         defined(__PPC64LE__)
 #      define R01_sig(p) ((p)->uc_mcontext.__gregs[_REG_R1])
+#      define R31_sig(p) ((p)->uc_mcontext.__gregs[_REG_R31])
 #      define R32_sig(p) ((p)->uc_mcontext.__gregs[_REG_PC])
+#      define R36_sig(p) ((p)->uc_mcontext.__gregs[_REG_LR])
 #    endif
 #  elif defined(__DragonFly__) || defined(__FreeBSD__) || \
       defined(__FreeBSD_kernel__)
@@ -214,7 +220,9 @@ using mozilla::DebugOnly;
 #    if defined(__FreeBSD__) && (defined(__ppc64__) || defined(__PPC64__) || \
                                  defined(__ppc64le__) || defined(__PPC64LE__))
 #      define R01_sig(p) ((p)->uc_mcontext.mc_gpr[1])
+#      define R31_sig(p) ((p)->uc_mcontext.mc_gpr[31])
 #      define R32_sig(p) ((p)->uc_mcontext.mc_srr0)
+#      define R36_sig(p) ((p)->uc_mcontext.mc_lr)
 #    endif
 #  elif defined(XP_DARWIN)
 #    define EIP_sig(p) ((p)->thread.uts.ts32.__eip)
@@ -375,7 +383,8 @@ struct macos_aarch64_context {
       defined(__PPC64LE__)
 #    define PC_sig(p) R32_sig(p)
 #    define SP_sig(p) R01_sig(p)
-#    define FP_sig(p) R01_sig(p)
+#    define FP_sig(p) R31_sig(p)
+#    define LR_sig(p) R36_sig(p)
 #  endif
 
 static void SetContextPC(CONTEXT* context, uint8_t* pc) {
@@ -410,7 +419,8 @@ static uint8_t* ContextToSP(CONTEXT* context) {
 #  endif
 }
 
-#  if defined(__arm__) || defined(__aarch64__) || defined(__mips__)
+#  if defined(__arm__) || defined(__aarch64__) || defined(__mips__) || \
+      defined(__ppc64__) || defined(__PPC64__)
 static uint8_t* ContextToLR(CONTEXT* context) {
 #    ifdef LR_sig
   return reinterpret_cast<uint8_t*>(LR_sig(context));
@@ -426,7 +436,8 @@ static JS::ProfilingFrameIterator::RegisterState ToRegisterState(
   state.fp = ContextToFP(context);
   state.pc = ContextToPC(context);
   state.sp = ContextToSP(context);
-#  if defined(__arm__) || defined(__aarch64__) || defined(__mips__)
+#  if defined(__arm__) || defined(__aarch64__) || defined(__mips__) || \
+      defined(__ppc64__) || defined(__PPC64__)
   state.lr = ContextToLR(context);
 #  else
   state.lr = (void*)UINTPTR_MAX;
@@ -543,7 +554,7 @@ struct AutoHandlingTrap {
     indirectCallToNull = true;
 
 #    elif defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || \
-        defined(JS_CODEGEN_MIPS64)
+        defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_PPC64)
 
     uint8_t* lr = ContextToLR(context);
 

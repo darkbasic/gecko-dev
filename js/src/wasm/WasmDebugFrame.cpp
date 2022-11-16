@@ -38,6 +38,10 @@ DebugFrame* DebugFrame::from(Frame* fp) {
   if (fp->callerIsTrampolineFP()) {
     offsetAdjustment =
         FrameWithTls::sizeOfTlsFields() + IndirectStubAdditionalAlignment;
+#if defined(JS_CODEGEN_PPC64)
+    // Our Frame has a linkage area in it which must be accounted for.
+    offsetAdjustment += 4 * sizeof(uintptr_t);
+#endif
   }
   auto* df = reinterpret_cast<DebugFrame*>(
       (uint8_t*)fp - (DebugFrame::offsetOfFrame() + offsetAdjustment));
