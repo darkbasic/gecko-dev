@@ -1898,44 +1898,6 @@ static void QuotientI64(MacroAssembler& masm, RegI64 rhs, RegI64 srcDest,
   } else {
     masm.as_divd(srcDest.reg, srcDest.reg, rhs.reg);
   }
-  MOZ_CRASH("BaseCompiler platform hook: quotientI64");
-#  endif
-}
-
-static void RemainderI64(MacroAssembler& masm, RegI64 rhs, RegI64 srcDest,
-                         RegI64 reserved, IsUnsigned isUnsigned) {
-#  if defined(JS_CODEGEN_X64)
-  // The caller must set up the following situation.
-  MOZ_ASSERT(srcDest.reg == rax);
-  MOZ_ASSERT(reserved.reg == rdx);
-
-  if (isUnsigned) {
-    masm.xorq(rdx, rdx);
-    masm.udivq(rhs.reg);
-  } else {
-    masm.cqo();
-    masm.idivq(rhs.reg);
-  }
-  masm.movq(rdx, rax);
-#  elif defined(JS_CODEGEN_MIPS64)
-  MOZ_ASSERT(reserved.isInvalid());
-  if (isUnsigned) {
-    masm.as_ddivu(srcDest.reg, rhs.reg);
-  } else {
-    masm.as_ddiv(srcDest.reg, rhs.reg);
-  }
-  masm.as_mfhi(srcDest.reg);
-#  elif defined(JS_CODEGEN_ARM64)
-  ARMRegister sd(srcDest.reg, 64);
-  ARMRegister r(rhs.reg, 64);
-  ARMRegister t(reserved.reg, 64);
-  if (isUnsigned) {
-    masm.Udiv(t, sd, r);
-  } else {
-    masm.Sdiv(t, sd, r);
-  }
-  masm.Mul(t, t, r);
-  masm.Sub(sd, sd, t);
 #  else
   MOZ_CRASH("BaseCompiler platform hook: quotientI64");
 #  endif
