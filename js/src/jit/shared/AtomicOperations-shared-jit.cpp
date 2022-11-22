@@ -55,6 +55,9 @@ static bool UnalignedAccessesAreOK() {
 #  elif defined(__aarch64__)
   // This is not necessarily true but it's the best guess right now.
   return true;
+#elif defined(JS_CODEGEN_PPC64)
+  // We'd sure like to avoid it, even though it works.
+  return false;
 #  else
 #    error "Unsupported platform"
 #  endif

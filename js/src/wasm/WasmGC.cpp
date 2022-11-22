@@ -281,6 +281,22 @@ bool wasm::IsValidStackMapKey(bool debugEnabled, const uint8_t* nextPC) {
 #  elif defined(JS_CODEGEN_LOONG64)
   // TODO(loong64): Implement IsValidStackMapKey.
   return true;
+#  elif defined(JS_CODEGEN_PPC64)
+  js::jit::Instruction* inst = (js::jit::Instruction*)nextPC;
+  //fprintf(stderr, "IsValidStackMapKey: 0x%lx 0x%08x 0x%08x\n", (uint64_t)nextPC, inst[0].encode(), inst[0].extractOpcode());
+  return (((uintptr_t(nextPC) & 3) == 0) && (
+           inst[0].extractOpcode() == 0xf0000000 ||         // VSX (xxlxor etc)
+           inst[0].extractOpcode() == js::jit::PPC_addi ||  // stack allocate
+           inst[0].extractOpcode() == js::jit::PPC_addis || // load immediate
+           inst[0].extractOpcode() == js::jit::PPC_cmpwi || // test after bl
+           inst[0].extractOpcode() == js::jit::PPC_cmpw ||  // (extsw, same)
+           inst[0].extractOpcode() == js::jit::PPC_lfd ||   // load FPR
+           inst[0].extractOpcode() == js::jit::PPC_lfs ||   // load FPR
+           inst[0].extractOpcode() == js::jit::PPC_lwz ||   // load GPR
+           inst[0].extractOpcode() == js::jit::PPC_ld ||    // load GPR
+           inst[0].extractOpcode() == js::jit::PPC_b ||     // branch
+           inst[0].encode() == js::jit::PPC_nop ||          // GET BACK TO WORK
+           inst[0].encode() == js::jit::PPC_stop));         // designated throw
 #  else
   MOZ_CRASH("IsValidStackMapKey: requires implementation on this platform");
 #  endif

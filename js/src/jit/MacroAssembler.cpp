@@ -2581,7 +2581,7 @@ void MacroAssembler::outOfLineTruncateSlow(FloatRegister src, Register dest,
 
 #if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) ||     \
     defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64) || \
-    defined(JS_CODEGEN_LOONG64)
+    defined(JS_CODEGEN_LOONG64) || defined(JS_CODEGEN_PPC64)
   ScratchDoubleScope fpscratch(*this);
   if (widenFloatToDouble) {
     convertFloat32ToDouble(src, fpscratch);
@@ -2620,7 +2620,7 @@ void MacroAssembler::outOfLineTruncateSlow(FloatRegister src, Register dest,
 
 #if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) ||     \
     defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64) || \
-    defined(JS_CODEGEN_LOONG64)
+    defined(JS_CODEGEN_LOONG64) || defined(JS_CODEGEN_PPC64)
   // Nothing
 #elif defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
   if (widenFloatToDouble) {
@@ -4339,6 +4339,8 @@ void MacroAssembler::emitPreBarrierFastPath(JSRuntime* rt, MIRType type,
   ma_dsll(temp1, temp1, temp3);
 #elif JS_CODEGEN_LOONG64
   as_sll_d(temp1, temp1, temp3);
+#elif JS_CODEGEN_PPC64
+  as_sld(temp1, temp1, temp3);
 #elif JS_CODEGEN_WASM32
   MOZ_CRASH();
 #elif JS_CODEGEN_NONE
@@ -5439,6 +5441,15 @@ void MacroAssembler::orderedHashTableLookup(Register setOrMapObj,
     assumeUnreachable("Unexpected non-BigInt");
   }
   bind(&ok);
+#endif
+
+#if defined(JS_CODEGEN_PPC64)
+  // If this was preceded by a MoveGroup instruction, the hash may have been
+  // loaded algebraically since it's an Int32 (and thus sign-extended); the
+  // operation doesn't know to keep the upper bits clear, failing the assert.
+  if (isBigInt == IsBigInt::No) {
+    as_rldicl(hash, hash, 0, 32); // "clrldi"
+  }
 #endif
 
 #ifdef DEBUG

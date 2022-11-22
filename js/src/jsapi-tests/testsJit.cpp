@@ -26,6 +26,11 @@ void PrepareJit(js::jit::MacroAssembler& masm) {
 #if defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64) || \
     defined(JS_CODEGEN_LOONG64)
   save.add(js::jit::ra);
+#elif defined(JS_CODEGEN_PPC64)
+  // XXX
+  // Push the link register separately, since it's not a GPR.
+  masm.xs_mflr(ScratchRegister);
+  masm.as_stdu(ScratchRegister, StackPointer, -8);
 #elif defined(JS_USE_LINK_REGISTER)
   save.add(js::jit::lr);
 #endif
@@ -44,6 +49,8 @@ bool ExecuteJit(JSContext* cx, js::jit::MacroAssembler& masm) {
 #if defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64) || \
     defined(JS_CODEGEN_LOONG64)
   save.add(js::jit::ra);
+#elif defined(JS_CODEGEN_PPC64)
+  // We pop after loading the regs.
 #elif defined(JS_USE_LINK_REGISTER)
   save.add(js::jit::lr);
 #endif
@@ -54,6 +61,13 @@ bool ExecuteJit(JSContext* cx, js::jit::MacroAssembler& masm) {
 
   // Reset stack pointer.
   masm.SetStackPointer64(PseudoStackPointer64);
+#elif defined(JS_CODEGEN_PPC64)
+  // XXX
+  // Pop LR and exit.
+  masm.as_ld(ScratchRegister, StackPointer, 0);
+  masm.xs_mtlr(ScratchRegister);
+  masm.as_addi(StackPointer, StackPointer, 8);
+  masm.as_blr();
 #else
   // Exit the JIT-ed code using the ABI return style.
   masm.abiret();

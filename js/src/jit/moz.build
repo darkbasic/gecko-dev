@@ -225,6 +225,18 @@ elif CONFIG["JS_CODEGEN_LOONG64"]:
     ]
     if CONFIG["JS_SIMULATOR_LOONG64"]:
         UNIFIED_SOURCES += ["loong64/Simulator-loong64.cpp"]
+elif CONFIG["JS_CODEGEN_PPC64"]:
+    UNIFIED_SOURCES += [
+        "ppc64/Architecture-ppc64.cpp",
+        "ppc64/Assembler-ppc64.cpp",
+        "ppc64/Bailouts-ppc64.cpp",
+        "ppc64/CodeGenerator-ppc64.cpp",
+        "ppc64/Lowering-ppc64.cpp",
+        "ppc64/MacroAssembler-ppc64.cpp",
+        "ppc64/MoveEmitter-ppc64.cpp",
+        "ppc64/Trampoline-ppc64.cpp",
+        "shared/AtomicOperations-shared-jit.cpp",
+    ]
 elif CONFIG["JS_CODEGEN_WASM32"]:
     UNIFIED_SOURCES += [
         "wasm32/CodeGenerator-wasm32.cpp",

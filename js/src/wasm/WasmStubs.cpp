@@ -730,7 +730,7 @@ static bool GenerateInterpEntry(MacroAssembler& masm, const FuncExport& fe,
   // Save the return address if it wasn't already saved by the call insn.
 #ifdef JS_USE_LINK_REGISTER
 #  if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS64) || \
-      defined(JS_CODEGEN_LOONG64)
+      defined(JS_CODEGEN_LOONG64) || defined(JS_CODEGEN_PPC64)
   masm.pushReturnAddress();
 #  elif defined(JS_CODEGEN_ARM64)
   // WasmPush updates framePushed() unlike pushReturnAddress(), but that's
@@ -2120,7 +2120,16 @@ static bool GenerateImportInterpExit(MacroAssembler& masm, const FuncImport& fi,
 
   // Make the call, test whether it succeeded, and extract the return value.
   AssertStackAlignment(masm, ABIStackAlignment);
+#ifdef JS_CODEGEN_PPC64
+  // Because this is calling an ABI-compliant function, we have to pull down
+  // a dummy linkage area or the values on the stack will be stomped on. The
+  // minimum size is sufficient.
+  masm.as_addi(masm.getStackPointer(), masm.getStackPointer(), -32);
+#endif
   masm.call(SymbolicAddress::CallImport_General);
+#ifdef JS_CODEGEN_PPC64
+  masm.as_addi(masm.getStackPointer(), masm.getStackPointer(), 32);
+#endif
   masm.branchTest32(Assembler::Zero, ReturnReg, ReturnReg, throwLabel);
 
   ResultType resultType = ResultType::Vector(funcType.results());
@@ -2638,6 +2647,11 @@ static const LiveRegisterSet RegsToPreserve(
 static const LiveRegisterSet RegsToPreserve(
     GeneralRegisterSet(Registers::AllMask &
                        ~(Registers::SetType(1) << Registers::StackPointer)),
+    FloatRegisterSet(FloatRegisters::AllMask));
+#elif defined(JS_CODEGEN_PPC64)
+// Note that this includes no SPRs, since the JIT is unaware of them.
+static const LiveRegisterSet RegsToPreserve(
+    GeneralRegisterSet(Registers::AllMask),
     FloatRegisterSet(FloatRegisters::AllMask));
 #else
 static const LiveRegisterSet RegsToPreserve(

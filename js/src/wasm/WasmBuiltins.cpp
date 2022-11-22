@@ -572,6 +572,10 @@ bool wasm::HandleThrow(JSContext* cx, WasmFrameIter& iter,
         rfe->framePointer = (uint8_t*)iter.frame();
         rfe->instance = iter.instance();
 
+#if defined(JS_CODEGEN_PPC64)
+          // Our Frame must also account for the linkage area.
+          offsetAdjustment += 4 * sizeof(uintptr_t);
+#endif
         rfe->stackPointer =
             (uint8_t*)(rfe->framePointer - tryNote->landingPadFramePushed());
         rfe->target =
